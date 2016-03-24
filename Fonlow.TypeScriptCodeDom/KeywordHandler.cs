@@ -11,10 +11,10 @@ namespace Fonlow.TypeScriptCodeDom
            new string[] {
 "break",     "case",      "catch",     "class",
 "const",     "continue",  "debugger",  "default",
-"delete",    "do","else",      "enum",
+"delete",    "do",		  "else",      "enum",
 "export",    "extends",   "false",     "finally",
-"for",       "function",  "if","import",
-"in","instanceof","new",       "null",
+"for",       "function",  "if",		   "import",
+"in",		 "instanceof","new",       "null",
 "return",    "super",     "switch",    "this",
 "throw",     "true",      "try",       "typeof",
 "var",       "void",      "while",     "with",
@@ -22,7 +22,6 @@ namespace Fonlow.TypeScriptCodeDom
 "private",   "protected", "public",    "static",
 "yield"
            }
-
         );
 
         public static bool IsAKeyword(string s)
@@ -36,7 +35,7 @@ namespace Fonlow.TypeScriptCodeDom
         }
 
         /// <summary>
-        /// Chick if not keyword, and leave the compiler to validate other factors
+        /// Check if not keyword, and leave the compiler to validate other factors
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
@@ -55,7 +54,5 @@ namespace Fonlow.TypeScriptCodeDom
             if (keywords.Contains(value))
                 throw new ArgumentException($"Keyword {value} cannot be used as an identifier.", "value");
         }
-
     }
-
 }

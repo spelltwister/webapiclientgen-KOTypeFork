@@ -1,6 +1,5 @@
 ﻿using System;
 
-
 namespace Fonlow.Poco2Client
 {
     /// <summary>
@@ -49,5 +48,4 @@ namespace Fonlow.Poco2Client
         Cherry,
         BigCherry,
     }
-
 }

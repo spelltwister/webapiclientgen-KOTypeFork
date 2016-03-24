@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Fonlow.Reflection;
+using Microsoft.CSharp;
 
 namespace Fonlow.Poco2Client
 {
@@ -15,15 +16,14 @@ namespace Fonlow.Poco2Client
     /// </summary>
     public class Poco2CsGen : IPoco2Client
     {
-        CodeCompileUnit targetUnit;
+	    protected readonly CodeCompileUnit TargetUnit;
+		protected readonly List<Type> pendingTypes;
 
-        /// <summary>
-        /// Init with its own CodeCompileUnit.
-        /// </summary>
-        public Poco2CsGen()
+		/// <summary>
+		/// Init with its own CodeCompileUnit.
+		/// </summary>
+		public Poco2CsGen() : this(new CodeCompileUnit())
         {
-            targetUnit = new CodeCompileUnit();
-            pendingTypes = new List<Type>();
         }
 
         /// <summary>
@@ -32,21 +32,22 @@ namespace Fonlow.Poco2Client
         /// <param name="codeCompileUnit"></param>
         public Poco2CsGen(CodeCompileUnit codeCompileUnit)
         {
-            targetUnit = codeCompileUnit;
+            this.TargetUnit = codeCompileUnit;
             pendingTypes = new List<Type>();
         }
-
-
+		
         /// <summary>
         /// Save TypeScript codes generated into a file.
         /// </summary>
         /// <param name="fileName"></param>
         public void SaveCodeToFile(string fileName)
         {
-            if (String.IsNullOrEmpty(fileName))
-                throw new ArgumentException("A valid fileName is not defined.", "fileName");
+	        if (String.IsNullOrWhiteSpace(fileName))
+	        {
+		        throw new ArgumentException("A valid fileName is not defined.", "fileName");
+	        }
 
-            try
+	        try
             {
                 using (StreamWriter writer = new StreamWriter(fileName))
                 {
@@ -67,24 +68,37 @@ namespace Fonlow.Poco2Client
             }
         }
 
+		/// <summary>
+		/// Writes the TypeScript code generated to the provided <see cref="TextWriter"/>
+		/// </summary>
+		/// <param name="writer">
+		/// <see cref="TextWriter"/> instance to which to write
+		/// </param>
         public void WriteCode(TextWriter writer)
         {
-            if (writer == null)
-                throw new ArgumentNullException("writer", "No TextWriter instance is defined.");
-
-            CodeDomProvider provider = CodeDomProvider.CreateProvider("CSharp");
-            CodeGeneratorOptions options = new CodeGeneratorOptions();
-
-            provider.GenerateCodeFromCompileUnit(targetUnit, writer, options);
+	        if (writer == null)
+	        {
+		        throw new ArgumentNullException("writer", "No TextWriter instance is defined.");
+	        }
+			
+			new CSharpCodeProvider().GenerateCodeFromCompileUnit(this.TargetUnit, writer, new CodeGeneratorOptions());
         }
 
+		/// <summary>
+		/// Creates a Code DOM for the given assembly based on the <see cref="CherryPickingMethods"/> option
+		/// </summary>
+		/// <param name="assembly">
+		/// Assembly for which to generate a Code DOM
+		/// </param>
+		/// <param name="methods">
+		/// <see cref="CherryPickingMethods"/> describing which types
+		/// and members to extract
+		/// </param>
         public void CreateCodeDom(Assembly assembly, CherryPickingMethods methods)
         {
             var cherryTypes = PodGenHelper.GetCherryTypes(assembly, methods);
             CreateCodeDom(cherryTypes, methods);
         }
-
-        List<Type> pendingTypes;
 
         /// <summary>
         /// Create TypeScript CodeDOM for POCO types. 
@@ -93,17 +107,17 @@ namespace Fonlow.Poco2Client
         /// <param name="types">POCO types.</param>
         public void CreateCodeDom(Type[] types, CherryPickingMethods methods)
         {
-            if (types == null)
-                throw new ArgumentNullException("types", "types is not defined.");
+	        if (types == null)
+	        {
+		        throw new ArgumentNullException("types", "types is not defined.");
+	        }
 
-            this.pendingTypes.AddRange(types);
-            var typeGroupedByNamespace = types.GroupBy(d => d.Namespace);
-            var namespacesOfTypes = typeGroupedByNamespace.Select(d => d.Key).ToArray();
+	        this.pendingTypes.AddRange(types);
+            var typeGroupedByNamespace = types.ToLookup(d => d.Namespace);
             foreach (var groupedTypes in typeGroupedByNamespace)
             {
-                var clientNamespaceText = (groupedTypes.Key + ".Client");
-                var clientNamespace = new CodeNamespace(clientNamespaceText);
-                targetUnit.Namespaces.Add(clientNamespace);//namespace added to Dom
+                var clientNamespace = new CodeNamespace($"{groupedTypes.Key}.Client");
+                this.TargetUnit.Namespaces.Add(clientNamespace);//namespace added to Dom
 
                 Debug.WriteLine("Generating types in namespace: " + groupedTypes.Key + " ...");
                 groupedTypes.Select(type =>
@@ -114,11 +128,13 @@ namespace Fonlow.Poco2Client
                     CodeTypeDeclaration typeDeclaration;
                     if (TypeHelper.IsClassOrStruct(type))
                     {
-                        typeDeclaration = type.IsClass ? PodGenHelper.CreatePodClientClass(clientNamespace, tsName): PodGenHelper.CreatePodClientStruct(clientNamespace, tsName);
+                        typeDeclaration = type.IsClass ? PodGenHelper.CreatePodClientClass(clientNamespace, tsName)
+						                               : PodGenHelper.CreatePodClientStruct(clientNamespace, tsName);
 
                         if (!type.IsValueType)
                         {
-                            if (namespacesOfTypes.Contains(type.BaseType.Namespace))
+							// TODO: guard against type.BaseType == null ?
+                            if (typeGroupedByNamespace.Contains(type.BaseType.Namespace))
                             {
                                 typeDeclaration.BaseTypes.Add(RefineCustomComplexTypeText(type.BaseType));
                             }
@@ -128,20 +144,20 @@ namespace Fonlow.Poco2Client
                             }
                         }
 
-
-                        foreach (var propertyInfo in type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public))
+                        foreach (var property in type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public)
+						                             .Select(x => new
+						                             {
+							                             CherryType = CherryPicking.GetMemberCherryType(x, methods),
+														 PropertyInfo = x
+						                             })
+													 .Where(x => x.CherryType != CherryType.None))
                         {
-                            var cherryType = CherryPicking.GetMemberCherryType(propertyInfo, methods);
-                            if (cherryType == CherryType.None)
-                                continue;
-                            string tsPropertyName;
-
+	                        var propertyInfo = property.PropertyInfo;
 
                             //todo: Maybe the required of JsonMemberAttribute?       var isRequired = cherryType == CherryType.BigCherry;
-                            tsPropertyName = propertyInfo.Name;//todo: String.IsNullOrEmpty(dataMemberAttribute.Name) ? propertyInfo.Name : dataMemberAttribute.Name;
-                            Debug.WriteLine(String.Format("{0} : {1}", tsPropertyName, propertyInfo.PropertyType.Name));
-
-                            
+                            string tsPropertyName = propertyInfo.Name;//todo: String.IsNullOrEmpty(dataMemberAttribute.Name) ? propertyInfo.Name : dataMemberAttribute.Name;
+                            Debug.WriteLine($"{0} : {1}", tsPropertyName, propertyInfo.PropertyType.Name);
+							
                             var clientProperty = new CodeMemberProperty()
                             {
                                 Name = tsPropertyName,
@@ -151,7 +167,7 @@ namespace Fonlow.Poco2Client
 
                             };
 
-                            var isRequired = cherryType == CherryType.BigCherry;
+                            var isRequired = property.CherryType == CherryType.BigCherry;
                             if (isRequired)
                             {
                                 clientProperty.CustomAttributes.Add(new CodeAttributeDeclaration("System.ComponentModel.DataAnnotations.RequiredAttribute"));
@@ -246,7 +262,6 @@ namespace Fonlow.Poco2Client
                             typeDeclaration.Members.Add(clientField);
                             k++;
                         }
-
                     }
                     else
                     {
@@ -255,48 +270,42 @@ namespace Fonlow.Poco2Client
                     }
 
                     return typeDeclaration;
-                }
-                    ).ToArray();//add classes into the namespace
+                })
+				.ToArray();//add classes into the namespace
             }
-
-
         }
 
+	    public CodeTypeReference TranslateToClientTypeReference(Type type)
+	    {
+		    if (type == null)
+			    return null; // new CodeTypeReference("void");
 
-        public CodeTypeReference TranslateToClientTypeReference(Type type)
-        {
-            if (type == null)
-                return null;// new CodeTypeReference("void");
+		    if (pendingTypes.Contains(type))
+			    return new CodeTypeReference(RefineCustomComplexTypeText(type));
 
-            if (pendingTypes.Contains(type))
-                return new CodeTypeReference(RefineCustomComplexTypeText(type));
-            else if (type.IsGenericType)
-            {
-                return TranslateGenericToTypeReference(type);
-            }
-            else if (type.IsArray)
-            {
-                Debug.Assert(type.Name.EndsWith("]"));
-                var elementType = type.GetElementType();
-                var arrayRank = type.GetArrayRank();
-                return CreateArrayTypeReference(elementType, arrayRank);
-            }
-            else
-            {
-                if (type.FullName == "System.Web.Http.IHttpActionResult")
-                    return new CodeTypeReference("System.Net.Http.HttpResponseMessage");
+		    if (type.IsGenericType)
+		    {
+			    return TranslateGenericToTypeReference(type);
+		    }
 
-                if (type.FullName == "System.Object" && (type.Attributes & System.Reflection.TypeAttributes.Serializable) == System.Reflection.TypeAttributes.Serializable)
-                    return new CodeTypeReference("Newtonsoft.Json.Linq.JObject");
+		    if (type.IsArray)
+		    {
+			    Debug.Assert(type.Name.EndsWith("]"));
+			    var elementType = type.GetElementType();
+			    var arrayRank = type.GetArrayRank();
+			    return CreateArrayTypeReference(elementType, arrayRank);
+		    }
 
-            }
+		    if (type.FullName == "System.Web.Http.IHttpActionResult")
+			    return new CodeTypeReference("System.Net.Http.HttpResponseMessage");
 
+		    if (type.FullName == "System.Object" && (type.Attributes & System.Reflection.TypeAttributes.Serializable) == System.Reflection.TypeAttributes.Serializable)
+			    return new CodeTypeReference("Newtonsoft.Json.Linq.JObject");
 
-            return new CodeTypeReference(type);
+		    return new CodeTypeReference(type);
+	    }
 
-        }
-
-        CodeTypeReference TranslateGenericToTypeReference(Type type)
+	    CodeTypeReference TranslateGenericToTypeReference(Type type)
         {
             Type genericTypeDefinition = type.GetGenericTypeDefinition();
             Type[] genericArguments = type.GetGenericArguments();
@@ -305,8 +314,7 @@ namespace Fonlow.Poco2Client
             {
                 var genericTypeReferences = type.GenericTypeArguments.Select(d => TranslateToClientTypeReference(d)).ToArray();
                 Debug.Assert(genericTypeReferences.Length == 1);
-                return new CodeTypeReference(typeof(Nullable).FullName
-                    , TranslateToClientTypeReference(genericArguments[0]));
+                return new CodeTypeReference(typeof(Nullable).FullName, TranslateToClientTypeReference(genericArguments[0]));
             }
 
             //Handle array types
@@ -382,7 +390,6 @@ namespace Fonlow.Poco2Client
                 }
             }
 
-
             if (genericArguments.Length == 2)
             {
                 if (genericTypeDefinition == typeof(IDictionary<,>))
@@ -403,12 +410,9 @@ namespace Fonlow.Poco2Client
                     return new CodeTypeReference(typeof(KeyValuePair<,>).FullName,
                         TranslateToClientTypeReference(genericArguments[0]), TranslateToClientTypeReference(genericArguments[1]));
                 }
-
-
             }
 
             return new CodeTypeReference(typeof(Object));
-
         }
 
         static string RefineCustomComplexTypeText(Type t)
@@ -439,7 +443,5 @@ namespace Fonlow.Poco2Client
             };
             return typeReference;
         }
-
     }
-
 }

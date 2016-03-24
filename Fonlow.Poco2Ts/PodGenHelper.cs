@@ -1,11 +1,8 @@
 ﻿using System.Reflection;
-using System.IO;
 using System.CodeDom;
-using System.CodeDom.Compiler;
 using System.Linq;
 using System.Diagnostics;
 using System;
-using System.Collections.Generic;
 using Fonlow.Reflection;
 
 namespace Fonlow.Poco2Client

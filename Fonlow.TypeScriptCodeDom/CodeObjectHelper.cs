@@ -34,7 +34,7 @@ namespace Fonlow.TypeScriptCodeDom
                 w.WriteLine();
             });
 
-            w.WriteLine($"}}");
+            w.WriteLine("}");
         }
 
         internal static void GenerateCodeFromType(CodeTypeDeclaration e, TextWriter w, CodeGeneratorOptions o)
@@ -86,7 +86,6 @@ namespace Fonlow.TypeScriptCodeDom
 
             if (WriteCodeMethodInvokeExpression(e as CodeMethodInvokeExpression, w, o))
                 return;
-
 
             var methodReferenceExpression = e as CodeMethodReferenceExpression;
             if (methodReferenceExpression != null)
@@ -194,9 +193,6 @@ namespace Fonlow.TypeScriptCodeDom
         #endregion
 
 
-
-
-
         #region WriteCodeXXXX
 
         static bool WriteCodeArrayIndexerExpression(CodeArrayIndexerExpression arrayIndexerExpression, TextWriter w, CodeGeneratorOptions o)
@@ -220,7 +216,7 @@ namespace Fonlow.TypeScriptCodeDom
             if (fieldReferenceExpression == null)
                 return false; 
 
-             GenerateCodeFromExpression(fieldReferenceExpression.TargetObject, w, o);
+            GenerateCodeFromExpression(fieldReferenceExpression.TargetObject, w, o);
             w.Write(".");
             w.Write(fieldReferenceExpression.FieldName);
             return true;
@@ -306,7 +302,7 @@ namespace Fonlow.TypeScriptCodeDom
                 return false;
 
             w.Write(o.IndentString);
-            w.Write($"return ");
+            w.Write("return ");
             GenerateCodeFromExpression(methodReturnStatement.Expression, w, o);
             return true;
         }
@@ -533,7 +529,6 @@ namespace Fonlow.TypeScriptCodeDom
                 w.WriteLine(snippetTypeMember.Text);
                 return;
             }
-
         }
 
         /// <summary>
@@ -701,7 +696,6 @@ namespace Fonlow.TypeScriptCodeDom
 
             w.WriteLine(IndentLines(snippetStatement.Value, o.IndentString));
             return true;
-
         }
 
         static bool WriteCodeVariableDeclarationStatement(CodeVariableDeclarationStatement variableDeclarationStatement, TextWriter w, CodeGeneratorOptions o)
@@ -725,7 +719,6 @@ namespace Fonlow.TypeScriptCodeDom
         static readonly Type typeOfString = typeof(string);
 
         #endregion
-
 
 
         #region Text
@@ -815,11 +808,17 @@ namespace Fonlow.TypeScriptCodeDom
 
         static string GetTypeOfType(CodeTypeDeclaration typeDeclaration)
         {
-            return typeDeclaration.IsEnum
-                ? "enum"
-                : typeDeclaration.IsInterface
-                    ? "interface"
-                    : "class";
+	        if (typeDeclaration.IsEnum)
+	        {
+		        return "enum";
+	        }
+
+	        if (typeDeclaration.IsInterface)
+	        {
+		        return "interface";
+	        }
+
+			return "class";
         }
 
         static string GetTypeParametersExpression(CodeTypeDeclaration typeDeclaration)
@@ -837,7 +836,6 @@ namespace Fonlow.TypeScriptCodeDom
                     typeParameterConstraint = $" extends {type}";
                 }
 
-
                 return $"{d.Name}{typeParameterConstraint}";
             }).ToArray();
 
@@ -846,17 +844,21 @@ namespace Fonlow.TypeScriptCodeDom
 
         static string GetBaseTypeExpression(CodeTypeDeclaration typeDeclaration)
         {
-            var baseTypes = typeDeclaration.BaseTypes
-                .OfType<CodeTypeReference>()
-                .Where(reference => TypeMapper.IsValidTypeForDerivation(reference))
-                .Select(reference => TypeMapper.MapCodeTypeReferenceToTsText(reference))
-                .ToList();
-            if (baseTypes.Any() && !typeDeclaration.IsEnum)
-            {
-                return $" extends {string.Join(",", baseTypes)}";
-            }
+	        if (!typeDeclaration.IsEnum)
+	        {
+		        var baseTypes = typeDeclaration.BaseTypes
+			        .OfType<CodeTypeReference>()
+			        .Where(reference => TypeMapper.IsValidTypeForDerivation(reference))
+			        .Select(reference => TypeMapper.MapCodeTypeReferenceToTsText(reference))
+			        .ToList();
 
-            return String.Empty;
+		        if (baseTypes.Any())
+		        {
+			        return $" extends {string.Join(",", baseTypes)}";
+		        }
+	        }
+
+	        return String.Empty;
         }
 
         static string GetEnumMember(CodeMemberField member)
@@ -882,7 +884,5 @@ namespace Fonlow.TypeScriptCodeDom
 
         #endregion
 
-
     }
-
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Reflection;
-using System.ComponentModel;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -8,7 +7,7 @@ namespace Fonlow.Reflection
 {
     public static class TypeHelper
     {
-        static readonly System.Collections.Generic.HashSet<string> arrayTypeNames = new System.Collections.Generic.HashSet<string>(
+        static readonly HashSet<string> arrayTypeNames = new HashSet<string>(
         new string[] {
             typeof(IEnumerable<>).FullName,
             typeof(IList<>).FullName,
@@ -57,6 +56,18 @@ namespace Fonlow.Reflection
             return null;
         }
 
+	    public static bool TryReadAttribute<T>(MemberInfo memberInfo, out T attribute) where T : Attribute
+	    {
+		    attribute = ReadAttribute<T>(memberInfo);
+		    return attribute != null;
+	    }
+
+	    public static bool HasAttribute<T>(MemberInfo memberInfo) where T : Attribute
+	    {
+		    T garbage;
+		    return TryReadAttribute(memberInfo, out garbage);
+	    }
+
         public static T ReadAttribute<T>(Type type) where T : Attribute
         {
             if (type == null)
@@ -71,6 +82,18 @@ namespace Fonlow.Reflection
             }
             return null;
         }
+
+	    public static bool TryReadAttribute<T>(Type type, out T attr) where T : Attribute
+	    {
+		    attr = ReadAttribute<T>(type);
+		    return attr != null;
+	    }
+
+	    public static bool HasAttribute<T>(Type type) where T : Attribute
+	    {
+		    T garbage;
+		    return TryReadAttribute(type, out garbage);
+	    }
 
         public static Attribute AttributeExists(Type type, string attributeTypeText)
         {
@@ -137,15 +160,12 @@ namespace Fonlow.Reflection
 
         public static bool IsClassOrStruct(Type type)
         {
-            return type.IsClass || (type.IsValueType && !type.IsPrimitive && !type.IsEnum);
+	        return type.IsClass || IsStruct(type);
         }
 
         public static bool IsStruct(Type type)
         {
             return (type.IsValueType && !type.IsPrimitive && !type.IsEnum);
         }
-
-
     }
-
 }

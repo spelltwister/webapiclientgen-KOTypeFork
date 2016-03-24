@@ -1,7 +1,6 @@
 ﻿using System;
 using System.CodeDom;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Fonlow.TypeScriptCodeDom
 {
@@ -12,29 +11,28 @@ namespace Fonlow.TypeScriptCodeDom
     {
         static readonly Dictionary<string, string> typeMap = new Dictionary<string, string>()
         {
-            {typeof(int).FullName, "number"},
-            {typeof(uint).FullName, "number"},
-            {typeof(long).FullName, "number"},
-            {typeof(ulong).FullName, "number"},
-            {typeof(short).FullName, "number"},
-            {typeof(ushort).FullName, "number"},
-            {typeof(float).FullName, "number"},
-            {typeof(double).FullName, "number"},
-            {typeof(decimal).FullName, "number"},
-            {typeof(byte).FullName, "number"},
-            {typeof(sbyte).FullName, "number"},
-            {typeof(string).FullName, "string"},
-            {typeof(char).FullName, "string"},
-            {typeof(Guid).FullName, "string"},
-            {typeof(bool).FullName, "boolean"},
-            {typeof(void).FullName, "void"},
-            {typeof(object).FullName, "any"},
-            {typeof(DateTime).FullName, "Date"},
-            {typeof(DateTimeOffset).FullName, "Date"},
+            { typeof(int           ).FullName, "number" },
+            { typeof(uint          ).FullName, "number" },
+            { typeof(long          ).FullName, "number" },
+            { typeof(ulong         ).FullName, "number" },
+            { typeof(short         ).FullName, "number" },
+            { typeof(ushort        ).FullName, "number" },
+            { typeof(float         ).FullName, "number" },
+            { typeof(double        ).FullName, "number" },
+            { typeof(decimal       ).FullName, "number" },
+            { typeof(byte          ).FullName, "number" },
+            { typeof(sbyte         ).FullName, "number" },
+            { typeof(string        ).FullName, "string" },
+            { typeof(char          ).FullName, "string" },
+            { typeof(Guid          ).FullName, "string" },
+            { typeof(bool          ).FullName, "boolean"},
+            { typeof(void          ).FullName, "void"   },
+            { typeof(object        ).FullName, "any"    },
+            { typeof(DateTime      ).FullName, "Date"   },
+            { typeof(DateTimeOffset).FullName, "Date"   },
             //TimeSpan is not so supported in Javascript
         };
-
-
+		
         static bool IsArrayType(CodeTypeReference codeTypeReference)
         {
             return codeTypeReference.ArrayElementType != null;
@@ -56,12 +54,10 @@ namespace Fonlow.TypeScriptCodeDom
         {
             if (type == null)
                 throw new ArgumentNullException("type");
-            string tsTypeName;
 
-            if (typeMap.TryGetValue(type.FullName, out tsTypeName))
-                return tsTypeName;
-
-            return null;
+			string tsTypeName;
+	        typeMap.TryGetValue(type.FullName, out tsTypeName);
+	        return tsTypeName;
         }
 
         /// <summary>
@@ -90,8 +86,7 @@ namespace Fonlow.TypeScriptCodeDom
             string tsTypeName;
             if (typeMap.TryGetValue(codeTypeReference.BaseType, out tsTypeName))
                 return tsTypeName;
-
-
+			
             if (codeTypeReference.TypeArguments.Count == 0)
             {
                 var codeSnipetTypeReference = codeTypeReference as CodeSnipetTypeReference;
@@ -157,7 +152,8 @@ namespace Fonlow.TypeScriptCodeDom
         {
             if (collection.Count > 8)
                 throw new ArgumentException("Current supports only up to 8 members for tuple.", "collection");
-            string[] ss = new string[collection.Count];
+
+			string[] ss = new string[collection.Count];
             for (int i = 0; i < collection.Count; i++)
             {
                 var typeName = MapCodeTypeReferenceToTsText(collection[i]);
@@ -176,8 +172,5 @@ namespace Fonlow.TypeScriptCodeDom
         {
             return Char.ToLower(s[0]) + s.Substring(1, s.Length - 1);
         }
-
     }
-
-
 }

@@ -1,7 +1,6 @@
 ﻿using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.IO;
-using System.Linq;
 
 namespace Fonlow.TypeScriptCodeDom
 {
@@ -19,19 +18,19 @@ namespace Fonlow.TypeScriptCodeDom
 
         void ICodeGenerator.GenerateCodeFromCompileUnit(CodeCompileUnit e, TextWriter w, CodeGeneratorOptions o)
         {
-            for (int i = 0; i < e.ReferencedAssemblies.Count; i++)
-            {
-                w.WriteLine("/// "+e.ReferencedAssemblies[i]);
-            }
+	        foreach (string referencedAssembly in e.ReferencedAssemblies)
+	        {
+		        w.WriteLine("/// "+ referencedAssembly);
+	        }
 
-            for (int i = 0; i < e.Namespaces.Count; i++)
+	        for (int i = 0; i < e.Namespaces.Count; i++)
             {
                 (this as ICodeGenerator).GenerateCodeFromNamespace(e.Namespaces[i], w, o);
                 w.WriteLine();
             }
         }
 
-        void ICodeGenerator.GenerateCodeFromExpression(CodeExpression e, TextWriter w, CodeGeneratorOptions o)
+	    void ICodeGenerator.GenerateCodeFromExpression(CodeExpression e, TextWriter w, CodeGeneratorOptions o)
         {
             CodeObjectHelper.GenerateCodeFromExpression(e, w, o);
         }
@@ -89,9 +88,7 @@ namespace Fonlow.TypeScriptCodeDom
         {
             KeywordHandler.ValidateIdentifier(value);
         }
-
     }
-
 
     public class TsCodeGenerationOptions : CodeGeneratorOptions
     {
@@ -114,6 +111,4 @@ namespace Fonlow.TypeScriptCodeDom
         }
         #endregion
     }
-
-
 }

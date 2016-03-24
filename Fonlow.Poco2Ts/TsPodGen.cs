@@ -16,15 +16,14 @@ namespace Fonlow.Poco2Ts
     /// </summary>
     public class Poco2TsGen : IPoco2Client
     {
-        CodeCompileUnit targetUnit;
-
-        /// <summary>
-        /// Init with its own CodeCompileUnit.
-        /// </summary>
-        public Poco2TsGen()
+        protected readonly CodeCompileUnit TargetUnit;
+		protected readonly List<Type> pendingTypes;
+		
+		/// <summary>
+		/// Init with its own CodeCompileUnit.
+		/// </summary>
+		public Poco2TsGen() : this(new CodeCompileUnit())
         {
-            targetUnit = new CodeCompileUnit();
-            pendingTypes = new List<Type>();
         }
 
         /// <summary>
@@ -33,7 +32,7 @@ namespace Fonlow.Poco2Ts
         /// <param name="codeCompileUnit"></param>
         public Poco2TsGen(CodeCompileUnit codeCompileUnit)
         {
-            targetUnit = codeCompileUnit;
+            this.TargetUnit = codeCompileUnit;
             pendingTypes = new List<Type>();
         }
 
@@ -44,10 +43,12 @@ namespace Fonlow.Poco2Ts
         /// <param name="fileName"></param>
         public void SaveCodeToFile(string fileName)
         {
-            if (String.IsNullOrEmpty(fileName))
-                throw new ArgumentException("A valid fileName is not defined.", "fileName");
+	        if (String.IsNullOrWhiteSpace(fileName))
+	        {
+		        throw new ArgumentException("A valid fileName is not defined.", "fileName");
+	        }
 
-            try
+	        try
             {
                 using (StreamWriter writer = new StreamWriter(fileName))
                 {
@@ -82,7 +83,7 @@ namespace Fonlow.Poco2Ts
             options.BracingStyle = "JS";
             options.IndentString = "    ";
 
-            provider.GenerateCodeFromCompileUnit(targetUnit, writer, options);
+            provider.GenerateCodeFromCompileUnit(this.TargetUnit, writer, options);
         }
 
         public void CreateCodeDom(Assembly assembly, CherryPickingMethods methods)
@@ -111,13 +112,11 @@ namespace Fonlow.Poco2Ts
                 throw new ArgumentNullException("types", "types is not defined.");
 
             this.pendingTypes.AddRange(types);
-            var typeGroupedByNamespace = types.GroupBy(d => d.Namespace);
-            var namespacesOfTypes = typeGroupedByNamespace.Select(d => d.Key).ToArray();
+            var typeGroupedByNamespace = types.ToLookup(d => d.Namespace);
             foreach (var groupedTypes in typeGroupedByNamespace)
             {
-                var clientNamespaceText = (groupedTypes.Key + ".Client").Replace('.', '_');
-                var clientNamespace = new CodeNamespace(clientNamespaceText);
-                targetUnit.Namespaces.Add(clientNamespace);//namespace added to Dom
+                var clientNamespace = new CodeNamespace($"{groupedTypes.Key}.Client".Replace('.', '_'));
+                this.TargetUnit.Namespaces.Add(clientNamespace);//namespace added to Dom
 
                 Debug.WriteLine("Generating types in namespace: " + groupedTypes.Key + " ...");
                 groupedTypes.Select(type =>
@@ -132,7 +131,7 @@ namespace Fonlow.Poco2Ts
 
                         if (!type.IsValueType)
                         {
-                            if (namespacesOfTypes.Contains(type.BaseType.Namespace))
+                            if (typeGroupedByNamespace.Contains(type.BaseType.Namespace))
                             {
                                 typeDeclaration.BaseTypes.Add(RefineCustomComplexTypeText(type.BaseType));
                             }
@@ -217,11 +216,9 @@ namespace Fonlow.Poco2Ts
                     }
 
                     return typeDeclaration;
-                }
-                    ).ToArray();//add classes into the namespace
+                })
+				.ToArray();//add classes into the namespace
             }
-
-
         }
 
         /// <summary>
@@ -239,13 +236,16 @@ namespace Fonlow.Poco2Ts
                 var typeText = Fonlow.TypeScriptCodeDom.TypeMapper.MapToTsBasicType(type);
                 return new CodeTypeReference(typeText);
             }
-            else if (pendingTypes.Contains(type))
+
+			if (pendingTypes.Contains(type))
                 return new CodeTypeReference(RefineCustomComplexTypeText(type));
-            else if (type.IsGenericType)
+
+			if (type.IsGenericType)
             {
                 return TranslateGenericToTsTypeReference(type);
             }
-            else if (type.IsArray)
+
+			if (type.IsArray)
             {
                 Debug.Assert(type.Name.EndsWith("]"));
                 var elementType = type.GetElementType();
@@ -259,8 +259,6 @@ namespace Fonlow.Poco2Ts
 
             return new CodeTypeReference("any");
         }
-
-        List<Type> pendingTypes;
 
         CodeTypeReference TranslateGenericToTsTypeReference(Type type)
         {
@@ -371,7 +369,6 @@ namespace Fonlow.Poco2Ts
             }
 
             return new CodeTypeReference("any");
-
         }
 
         static string RefineCustomComplexTypeText(Type t)
@@ -402,8 +399,5 @@ namespace Fonlow.Poco2Ts
             };
             return otherArrayType;
         }
-
-
     }
-
 }
